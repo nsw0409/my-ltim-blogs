@@ -1,9 +1,43 @@
-const express = require('express'); 
-const app = express(); 
-const port = process.env.PORT || 3000; 
-app.get('/', (req, res) => { 
-    res.send('Welcome to LTIM blogs!'); 
-}); 
+const express = require('express');
+const axios = require('axios');
+const cors = require("cors");
+require('dotenv').config();
+const port = process.env.PORT || 3000;
+const clientID = process.env.CLIENT_ID;
+const clientSecret = process.env.CLIENT_SECRET;
+const https = require('https');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(express.static(__dirname + '/public'));
+
+if(process.env.NODE_ENV === 'development'){
+    const httpsAgent = new https.Agent({
+        rejectUnauthorized: false,
+    })
+    axios.defaults.httpsAgent = httpsAgent;
+    console.log(process.env.NODE_ENV, `RejectUnauthorized is disabled.`)
+}
+
+app.get('/',(req,res)=>{
+    res.sendFile('./index.html')
+})
+
+app.get('/auth/callback', (req, res) => {
+    const requestToken = req.query.code;
+    axios({
+      method: 'post',
+      url: `https://github.com/login/oauth/access_token?client_id=${clientID}&client_secret=${clientSecret}&code=${requestToken}`,
+      headers: {
+        accept: 'application/json'
+      }
+    }).then((response) => {
+        const accessToken = response.data.access_token;
+        res.redirect(`/welcome.html?code=${accessToken}`);
+    })
+})
+
 app.listen(port, () => { 
     console.log(`Server is running on port ${port}`); 
 });
