@@ -26,16 +26,6 @@ if(process.env.NODE_ENV === 'development'){
     console.log(process.env.NODE_ENV, `RejectUnauthorized is disabled.`)
 }
 
-socketServer.on('connection', socket => {
-  socket.send(clientID);
-  socket.on('message', message => {
-    // console.log(`Received message: ${message}`);
-  });
-  socket.on('close', () => {
-    // console.log('Client disconnected');
-  });
-});
-
 app.get('/',(req,res)=>{
     res.sendFile('./index.html');
 })
@@ -55,5 +45,14 @@ app.get('/auth/callback', (req, res) => {
 })
 
 app.listen(port, () => { 
-    console.log(`Server is running on port ${port}`); 
+    console.log(`Server is running on port ${port}`);
+    socketServer.on('connection', socket => {
+      socket.send(clientID);
+      socket.on('message', message => {
+        console.log(`Received message: ${message}`);
+      });
+      socket.on('close', () => {
+        console.log('Client disconnected');
+      });
+    });
 });
