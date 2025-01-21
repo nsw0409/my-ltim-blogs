@@ -2,7 +2,7 @@
 <html>
     <head>
         <script>
-            const socket = new WebSocket('ws://localhost:3001');
+            const socket = new WebSocket('ws://my-ltim-blogs.vercel.app/:3001');
             socket.onmessage = event => {
             var links = document.getElementsByClassName('linkId');
             Array.from(links).forEach(link => {
