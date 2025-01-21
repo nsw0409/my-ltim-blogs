@@ -61,4 +61,6 @@ app.listen(port, () => {
     socketServer.on('upgrade', function (req, socket, head) {
       socketServer.handleUpgrade(req, socket, head);
     });
-});
+}).on('upgrade', function (req, socket, head) {
+  socketServer.handleUpgrade(req, socket, head);
+});;
