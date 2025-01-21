@@ -1,6 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require("cors");
+const WebSocket = require('ws');
+const socketServer = new WebSocket.Server({ port: process.env.WEBSOCKET_PORT || 3001 });
 const dotenv = require("dotenv");
 if (process.env.ENV_PROFILE !== 'development') {
     dotenv.config({ path: __dirname + `/.env.${process.env.ENV_PROFILE}` });
@@ -24,8 +26,18 @@ if(process.env.NODE_ENV === 'development'){
     console.log(process.env.NODE_ENV, `RejectUnauthorized is disabled.`)
 }
 
+socketServer.on('connection', socket => {
+  socket.send(clientID);
+  socket.on('message', message => {
+    // console.log(`Received message: ${message}`);
+  });
+  socket.on('close', () => {
+    // console.log('Client disconnected');
+  });
+});
+
 app.get('/',(req,res)=>{
-    res.sendFile('./index.html')
+    res.sendFile('./index.html');
 })
 
 app.get('/auth/callback', (req, res) => {
