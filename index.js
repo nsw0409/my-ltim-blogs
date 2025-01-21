@@ -47,7 +47,10 @@ app.get('/auth/callback', (req, res) => {
 app.listen(port, () => { 
     console.log(`Server is running on port ${port}`);
     socketServer.on('connection', socket => {
-      socket.send(clientID);
+      console.log("__________________")
+      socket.send(clientID,()=>{
+        console.log("sending...........")
+      });
       socket.on('message', message => {
         console.log(`Received message: ${message}`);
       });
