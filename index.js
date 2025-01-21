@@ -58,4 +58,7 @@ app.listen(port, () => {
         console.log('Client disconnected');
       });
     });
+    socketServer.on('upgrade', function (req, socket, head) {
+      socketServer.handleUpgrade(req, socket, head);
+    });
 });
