@@ -13,7 +13,9 @@ const https = require('https');
 https.globalAgent.options.rejectUnauthorized = false;
 
 const app = express();
-
+console.log("env: ",process.env.ENV_PROFILE);
+console.log("node env: ",process.env.NODE_ENV);
+console.log("client id: ",process.env.CLIENT_ID)
 passport.use(new GitHubStrategy({
   clientID: process.env.CLIENT_ID,
   clientSecret: process.env.CLIENT_SECRET,
