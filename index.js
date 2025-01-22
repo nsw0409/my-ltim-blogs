@@ -1,8 +1,7 @@
 const express = require('express');
-const axios = require('axios');
+const passport = require('passport');
+const GitHubStrategy = require('passport-github2').Strategy;
 const cors = require("cors");
-const WebSocket = require('ws');
-const socketServer = new WebSocket.Server({ port: process.env.WEBSOCKET_PORT || 3001 });
 const dotenv = require("dotenv");
 if (process.env.ENV_PROFILE !== 'development') {
     dotenv.config({ path: __dirname + `/.env.${process.env.ENV_PROFILE}` });
@@ -10,57 +9,60 @@ if (process.env.ENV_PROFILE !== 'development') {
     dotenv.config({ path: __dirname + "/.env" });
 }
 const port = process.env.PORT || 3000;
-const clientID = process.env.CLIENT_ID;
-const clientSecret = process.env.CLIENT_SECRET;
 const https = require('https');
+https.globalAgent.options.rejectUnauthorized = false;
 
 const app = express();
+
+passport.use(new GitHubStrategy({
+  clientID: process.env.CLIENT_ID,
+  clientSecret: process.env.CLIENT_SECRET,
+  callbackURL: process.env.CALLBACK_URL
+},
+function(accessToken, refreshToken, profile, done) {
+  // Here you can save the user profile to your database
+  return done(null, profile);
+}));
+// Serialize and deserialize user (required for session handling)
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((obj, done) => {
+  done(null, obj);
+});
+
+// Initialize passport and session
+app.use(require('express-session')({ secret: 'secret', resave: true, saveUninitialized: true }));
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname + '/public'));
-if(process.env.NODE_ENV === 'development'){
-    const httpsAgent = new https.Agent({
-        rejectUnauthorized: false,
-    })
-    axios.defaults.httpsAgent = httpsAgent;
-    console.log(process.env.NODE_ENV, `RejectUnauthorized is disabled.`)
-}
+// app.use(express.static(__dirname + '/public'));
 
-app.get('/',(req,res)=>{
-    res.sendFile('./index.html');
-})
+app.get('/', (req, res) => {
+  res.send('<a href="/auth/github">Login with GitHub for doing oAuth</a>');
+});
 
-app.get('/auth/callback', (req, res) => {
-    const requestToken = req.query.code;
-    axios({
-      method: 'post',
-      url: `https://github.com/login/oauth/access_token?client_id=${clientID}&client_secret=${clientSecret}&code=${requestToken}`,
-      headers: {
-        accept: 'application/json'
-      }
-    }).then((response) => {
-        const accessToken = response.data.access_token;
-        res.redirect(`/welcome.html?code=${accessToken}`);
-    })
-})
+app.get('/auth/github',
+  passport.authenticate('github', { scope: ['user:email'] })
+);
+
+app.get('/auth/callback',
+  passport.authenticate('github', { failureRedirect: '/' }),
+  (req, res) => {
+      res.redirect('/welcome');
+  }
+);
+
+app.get('/welcome', (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.redirect('/');
+  }
+  res.json(req.user);
+});
 
 app.listen(port, () => { 
-    console.log(`Server is running on port ${port}`);
-    socketServer.on('connection', socket => {
-      console.log("__________________")
-      socket.send(clientID,()=>{
-        console.log("sending...........")
-      });
-      socket.on('message', message => {
-        console.log(`Received message: ${message}`);
-      });
-      socket.on('close', () => {
-        console.log('Client disconnected');
-      });
-    });
-    socketServer.on('upgrade', function (req, socket, head) {
-      socketServer.handleUpgrade(req, socket, head);
-    });
-}).on('upgrade', function (req, socket, head) {
-  socketServer.handleUpgrade(req, socket, head);
-});;
+  console.log(`Server is running on port ${port}`);
+})
