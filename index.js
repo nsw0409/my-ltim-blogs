@@ -13,9 +13,6 @@ const https = require('https');
 https.globalAgent.options.rejectUnauthorized = false;
 
 const app = express();
-console.log("env: ",process.env.ENV_PROFILE);
-console.log("node env: ",process.env.NODE_ENV);
-console.log("client id: ",process.env.CLIENT_ID)
 passport.use(new GitHubStrategy({
   clientID: process.env.CLIENT_ID,
   clientSecret: process.env.CLIENT_SECRET,
@@ -23,6 +20,7 @@ passport.use(new GitHubStrategy({
 },
 function(accessToken, refreshToken, profile, done) {
   // Here you can save the user profile to your database
+  profile.accessToken = accessToken;
   return done(null, profile);
 }));
 // Serialize and deserialize user (required for session handling)
@@ -42,6 +40,15 @@ app.use(passport.session());
 app.use(cors());
 app.use(express.json());
 // app.use(express.static(__dirname + '/public'));
+
+// Middleware to verify access token
+function verifyAccessToken(req, res, next) {
+  if (req.isAuthenticated() && req.user && req.user.accessToken) {
+      next();
+  } else {
+      res.status(401).json({message: 'Unauthorized'});
+  }
+}
 
 app.get('/', (req, res) => {
   res.send('<a href="/auth/github">Login with GitHub for doing oAuth</a>');
@@ -63,6 +70,10 @@ app.get('/welcome', (req, res) => {
     return res.redirect('/');
   }
   res.json(req.user);
+});
+
+app.get('/profile', verifyAccessToken, (req, res) => {
+  res.send('in profile page')
 });
 
 app.listen(port, () => { 
