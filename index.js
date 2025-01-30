@@ -1,69 +1,74 @@
 const express = require('express');
-const passport = require('passport');
-const GitHubStrategy = require('passport-github2').Strategy;
 const cors = require("cors");
+const axios = require("axios");
+const blogRoutes = require('./routes/blog.routes');
+const commentRoutes = require('./routes/comment.routes');
 const dotenv = require("dotenv");
 if (process.env.ENV_PROFILE !== 'development') {
-    dotenv.config({ path: __dirname + `/.env.${process.env.ENV_PROFILE}` });
-  } else {
-    dotenv.config({ path: __dirname + "/.env" });
+  dotenv.config({ path: __dirname + `/.env.${process.env.ENV_PROFILE}` });
+} else {
+  dotenv.config({ path: __dirname + "/.env" });
 }
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
+const connectDB = require('./db');
 const https = require('https');
 https.globalAgent.options.rejectUnauthorized = false;
 
 const app = express();
-passport.use(new GitHubStrategy({
-  clientID: process.env.CLIENT_ID,
-  clientSecret: process.env.CLIENT_SECRET,
-  callbackURL: process.env.CALLBACK_URL
-},
-function(accessToken, refreshToken, profile, done) {
-  // Here you can save the user profile to your database
-  profile.accessToken = accessToken;
-  return done(null, profile);
-}));
-// Serialize and deserialize user (required for session handling)
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((obj, done) => {
-  done(null, obj);
-});
-
-// Initialize passport and session
-app.use(require('express-session')({ secret: 'secret', resave: true, saveUninitialized: true }));
-app.use(passport.initialize());
-app.use(passport.session());
-
+connectDB();
+let ssn;
 app.use(cors());
+app.use(require('express-session')({ secret: 'secret', resave: true, saveUninitialized: true }));
 app.use(express.json());
-// app.use(express.static(__dirname + '/public'));
+app.use('/blogs', verifyAccessToken, blogRoutes);
+app.use('/comments', verifyAccessToken, commentRoutes);
 
 // Middleware to verify access token
 function verifyAccessToken(req, res, next) {
-  if (req.isAuthenticated() && req.user && req.user.accessToken) {
-      next();
+  if (ssn?.accessToken && ssn?.accessToken === req.headers['authorization']) {
+    next();
   } else {
-      res.status(401).json({message: 'Unauthorized'});
+    res.status(401).json({ message: 'Unauthorized' });
   }
 }
 
-app.get('/', (req, res) => {
-  res.send('<a href="/auth/github">Login with GitHub for doing oAuth</a>');
+app.get("/auth", (req, res) => {
+  res.redirect(`https://github.com/login/oauth/authorize?client_id=${process.env.CLIENT_ID}`);
+})
+
+app.get('/getAccessToken', (req, res) => {
+  const { code } = req.query;
+  const params = `?client_id=${process.env.CLIENT_ID}&client_secret=${process.env.CLIENT_SECRET}&code=${code}`;
+  axios.post('https://github.com/login/oauth/access_token'+params)
+    .then(response => {
+      const accessToken = extractAccessToken(response.data);
+      res.status(200).json({accessToken:accessToken})
+    })
+    .catch(error => {
+      res.status(500).send('Error obtaining access token');
+    });
 });
 
-app.get('/auth/github',
-  passport.authenticate('github', { scope: ['user:email'] })
-);
+function extractAccessToken(str) {
+  const params = new URLSearchParams(str);
+  return params.get('access_token');
+}
 
-app.get('/auth/callback',
-  passport.authenticate('github', { failureRedirect: '/' }),
-  (req, res) => {
-      res.redirect('/welcome');
-  }
-);
+app.get('/test', (req, res) => {
+  const token = req.query.token;
+  // Use the token to fetch user details from GitHub API
+  axios.get('https://api.github.com/user', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then(response => {
+      res.json(response.data);
+    })
+    .catch(error => {
+      res.status(500).send('Error fetching user details');
+    });
+})
 
 app.get('/welcome', (req, res) => {
   if (!req.isAuthenticated()) {
@@ -76,6 +81,6 @@ app.get('/profile', verifyAccessToken, (req, res) => {
   res.send('in profile page')
 });
 
-app.listen(port, () => { 
+app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 })
